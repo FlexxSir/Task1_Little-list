@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Little List — Todo</title>
+  <style>
+    :root { color-scheme: light; --ink:#24302c; --muted:#77817b; --line:#e8eae4; --green:#47765e; --cream:#f7f7f2; }
+    * { box-sizing:border-box }
+    body { margin:0; min-height:100vh; background:var(--cream); color:var(--ink); font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif; }
+    .shell { width:min(100% - 32px, 680px); margin:0 auto; padding:58px 0 48px; }
+    header { margin-bottom:31px; }
+    .eyebrow { color:var(--green); font-size:12px; letter-spacing:.14em; font-weight:750; text-transform:uppercase; }
+    h1 { margin:8px 0 4px; font:500 clamp(36px,8vw,52px)/1.05 Georgia,serif; letter-spacing:-.04em; }
+    .subtitle { margin:0; color:var(--muted); }
+    .card { background:#fff; border:1px solid var(--line); border-radius:18px; box-shadow:0 12px 36px #25352b0a; overflow:hidden; }
+    form { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:10px; padding:18px; border-bottom:1px solid var(--line); }
+    input { border:1px solid #dfe3dc; border-radius:10px; padding:11px 12px; font:inherit; outline:none; }
+    input:focus { border-color:var(--green); box-shadow:0 0 0 3px #47765e1c; }
+    input[type="text"] { min-width:0; width:100%; padding:13px 14px; }
+    input[type="datetime-local"] { grid-column:1; width:min(100%,240px); color:var(--muted); font-size:13px; }
+    form button { grid-column:2; grid-row:1 / span 2; }
+    button { border:0; border-radius:10px; padding:0 19px; background:var(--green); color:white; font:650 15px system-ui,sans-serif; cursor:pointer; transition:background .15s,transform .15s; }
+    button:hover { background:#365e49; } button:active { transform:scale(.97); }
+    .toolbar { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 18px 11px; }
+    .filters { display:flex; gap:5px; }
+    .filter { padding:7px 10px; background:transparent; color:var(--muted); font-size:13px; }
+    .filter:hover { background:#f4f6f1; color:var(--ink); }
+    .filter.active { background:#edf3ee; color:var(--green); }
+    #count { color:var(--muted); font-size:13px; white-space:nowrap; }
+    ul { list-style:none; padding:0 18px; margin:0; }
+    .task { display:flex; align-items:center; gap:12px; padding:15px 2px; border-top:1px solid var(--line); animation:appear .2s ease-out; }
+    @keyframes appear { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:none } }
+    .check { width:21px; height:21px; flex:none; accent-color:var(--green); cursor:pointer; }
+    .task-text { flex:1; overflow-wrap:anywhere; }
+    .task-info { flex:1; min-width:0; }
+    .task-info .task-text { display:block; }
+    .task-due { display:block; margin-top:3px; color:var(--muted); font-size:12px; }
+    .task.done .task-text { color:#9aa29c; text-decoration:line-through; }
+    .delete { width:34px; height:34px; padding:0; background:transparent; color:#9aa29c; font-size:21px; line-height:1; }
+    .delete:hover { color:#b84c42; background:#fff1ef; }
+    .empty { padding:34px 12px 40px; text-align:center; color:var(--muted); }
+    .empty-icon { display:block; margin-bottom:8px; font-size:29px; }
+    .footer { display:flex; justify-content:space-between; align-items:center; min-height:55px; padding:10px 18px; color:var(--muted); font-size:12px; }
+    .clear { padding:7px 8px; color:var(--muted); background:transparent; font-size:12px; font-weight:500; }
+    .clear:hover { color:#b84c42; background:#fff1ef; }
+    .hint { margin:16px 4px 0; color:#929a94; font-size:12px; text-align:center; }
+    @media(max-width:430px) { .shell { padding-top:38px; } form { padding:13px; } form button { padding:0 14px; } input[type="datetime-local"] { width:100%; } .toolbar { padding:12px 13px 9px; } ul { padding:0 13px; } .footer { padding:9px 13px; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div class="eyebrow">A little more room to think</div>
+      <h1>Aboki HNG 15 List</h1>
+      <p class="subtitle">One thing at a time is a good way to begin.</p>
+    </header>
+    <section class="card" aria-label="Todo list">
+      <form id="todo-form">
+        <input id="todo-input" type="text" maxlength="120" placeholder="What would you like to do?" aria-label="New todo" autocomplete="off" required>
+        <input id="todo-due" type="datetime-local" aria-label="Optional due date and time">
+        <button type="submit">Add task</button>
+      </form>
+      <div class="toolbar">
+        <div class="filters" aria-label="Filter tasks">
+          <button class="filter active" data-filter="all" type="button">All</button>
+          <button class="filter" data-filter="active" type="button">Active</button>
+          <button class="filter" data-filter="done" type="button">Done</button>
+        </div>
+        <span id="count" aria-live="polite"></span>
+      </div>
+      <ul id="todo-list"></ul>
+      <div class="empty" id="empty-state"><span class="empty-icon">☀️</span><span id="empty-message">Your list is clear. Add a task to get started.</span></div>
+      <div class="footer"><span>Saved in this browser</span><button id="clear-done" class="clear" type="button">Clear completed</button></div>
+    </section>
+    <p class="hint">Tip: press Enter to add a task.</p>
+  </main>
+  <script>
+    // The list of tasks is kept in the browser's local storage.
+    const STORAGE_KEY = "little-list-tasks";
+    let tasks = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    let currentFilter = "all";
+
+    const form = document.querySelector("#todo-form");
+    const input = document.querySelector("#todo-input");
+    const dueInput = document.querySelector("#todo-due");
+    const list = document.querySelector("#todo-list");
+    const count = document.querySelector("#count");
+    const emptyState = document.querySelector("#empty-state");
+    const emptyMessage = document.querySelector("#empty-message");
+
+    function saveTasks() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    }
+
+    function renderTasks() {
+      const visibleTasks = tasks.filter(task => {
+        if (currentFilter === "active") return !task.done;
+        if (currentFilter === "done") return task.done;
+        return true;
+      });
+      list.replaceChildren();
+
+      visibleTasks.forEach(task => {
+        const row = document.createElement("li");
+        row.className = `task${task.done ? " done" : ""}`;
+        const checkbox = document.createElement("input");
+        checkbox.type = "checkbox";
+        checkbox.className = "check";
+        checkbox.checked = task.done;
+        checkbox.setAttribute("aria-label", `Mark ${task.text} as ${task.done ? "not done" : "done"}`);
+        checkbox.addEventListener("change", () => {
+          task.done = checkbox.checked;
+          saveTasks();
+          renderTasks();
+        });
+        const info = document.createElement("div");
+        info.className = "task-info";
+        const text = document.createElement("span");
+        text.className = "task-text";
+        text.textContent = task.text;
+        info.append(text);
+        if (task.due) {
+          const due = document.createElement("time");
+          due.className = "task-due";
+          due.dateTime = task.due;
+          due.textContent = `Due ${new Date(task.due).toLocaleString([], { dateStyle: "medium", timeStyle: "short" })}`;
+          info.append(due);
+        }
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "delete";
+        remove.textContent = "×";
+        remove.setAttribute("aria-label", `Delete ${task.text}`);
+        remove.addEventListener("click", () => {
+          tasks = tasks.filter(item => item.id !== task.id);
+          saveTasks();
+          renderTasks();
+        });
+        row.append(checkbox, info, remove);
+        list.append(row);
+      });
+
+      const remaining = tasks.filter(task => !task.done).length;
+      count.textContent = `${remaining} ${remaining === 1 ? "task" : "tasks"} left`;
+      emptyState.hidden = visibleTasks.length > 0;
+      if (visibleTasks.length === 0) {
+        emptyMessage.textContent = currentFilter === "active" ? "No active tasks. Nice work!" : currentFilter === "done" ? "No completed tasks yet." : "Your list is clear. Add a task to get started.";
+      }
+      document.querySelector("#clear-done").disabled = !tasks.some(task => task.done);
+    }
+
+    form.addEventListener("submit", event => {
+      event.preventDefault();
+      const text = input.value.trim();
+      if (!text) return;
+      tasks.push({ id: Date.now(), text, due: dueInput.value || null, done: false });
+      saveTasks();
+      renderTasks();
+      input.value = "";
+      dueInput.value = "";
+      input.focus();
+    });
+
+    document.querySelectorAll(".filter").forEach(button => {
+      button.addEventListener("click", () => {
+        currentFilter = button.dataset.filter;
+        document.querySelectorAll(".filter").forEach(item => item.classList.toggle("active", item === button));
+        renderTasks();
+      });
+    });
+
+    document.querySelector("#clear-done").addEventListener("click", () => {
+      tasks = tasks.filter(task => !task.done);
+      saveTasks();
+      renderTasks();
+    });
+
+    renderTasks();
+  </script>
+</body>
+</html>
